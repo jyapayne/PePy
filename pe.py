@@ -1222,7 +1222,7 @@ class PEFile(Printable):
         of the file, but that did not work. Comments were left as history
         to what I attempted.
         """
-        icon_path = os.path.expanduser(icon_path)
+        icon_path = str(os.path.expanduser(icon_path)) #this needs to be a string and not unicode
 
         if pm is None:
             raise Exception('PythonMagick is required to run this function.')
