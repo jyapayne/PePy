@@ -1222,9 +1222,13 @@ class PEFile(Printable):
         of the file, but that did not work. Comments were left as history
         to what I attempted.
         """
+        icon_path = os.path.expanduser(icon_path)
 
         if pm is None:
             raise Exception('PythonMagick is required to run this function.')
+
+        if not os.path.exists(icon_path):
+            raise Exception('Icon {} does not exist'.format(icon_path))
 
         resource_section = self.sections['.rsrc']
 
