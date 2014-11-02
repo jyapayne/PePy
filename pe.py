@@ -1,10 +1,24 @@
 import os
 import struct
-try:
-    import PythonMagick as pm
-except ImportError:
-    print 'PythonMagick is required to replace pe icon file. This functionality is disabled because you need to install it.'
-    pm = None
+from cStringIO import StringIO
+
+from ico_plugin import *
+
+def resize(image, size):
+    output = StringIO()
+    back = Image.new('RGBA', size, (0,0,0,0))
+    image.thumbnail(size, Image.ANTIALIAS)
+    offset = [0,0]
+    if image.size[0] >= image.size[1]:
+        offset[1] = back.size[1]/2-image.size[1]/2
+    else:
+        offset[0] = back.size[0]/2-image.size[0]/2
+    back.paste(image, tuple(offset))
+    back.save(output, image.format)
+    contents = output.getvalue()
+    output.close()
+    return contents
+
 
 struct_symbols = {1:'B',#byte
                   2:'H',#word
@@ -1224,9 +1238,6 @@ class PEFile(Printable):
         """
         icon_path = str(os.path.expanduser(icon_path)) #this needs to be a string and not unicode
 
-        if pm is None:
-            raise Exception('PythonMagick is required to run this function.')
-
         if not os.path.exists(icon_path):
             raise Exception('Icon {} does not exist'.format(icon_path))
 
@@ -1240,13 +1251,21 @@ class PEFile(Printable):
         group_header = GroupHeader.parse_from_data(self.pe_file_data, absolute_offset=g_icon_data_entry.get_data_absolute_offset())
         g_entry = group_header.entries[0]
 
-        icon = pm.Image(icon_path)
-        icon.sample('!{}x{}'.format(g_entry.Width.value, g_entry.Height.value)) #resize. Force aspect ratio to change with !
-        icon.magick('ICO') # convert to ico
-        b = pm.Blob()
-        icon.write(b)
+        icon = Image.open(icon_path)
+        i_data = resize(icon, (g_entry.Width.value, g_entry.Height.value))
+        s = StringIO()
+        s.write(i_data)
+        s.seek(0)
 
-        icon_data = bytearray(b.data)
+        icon = Image.open(s)
+        s2 = StringIO()
+        icon.save(s2, 'ico')
+        new_icon_size = s2.tell()
+        s2.seek(0)
+        icon_file_size = g_entry.DataSize.value+group_header.size+g_entry.size+2
+
+        #9662 is the exact length of the icon in nw.exe
+        icon_data = bytearray(s2.read()) + bytearray(icon_file_size-new_icon_size)
 
         icon_header = IconHeader.parse_from_data(icon_data, absolute_offset=0)
 
