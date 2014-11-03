@@ -291,7 +291,7 @@ def get_data(im):
         dib = dib[:40]
         bmp_f.seek(offset)
         data = bytearray(bmp_f.read())
-        data = dib+data[24:] + bytearray(24)
+        data = dib+data
     else:
         data = bytearray(s.read())
 
@@ -330,6 +330,31 @@ def _save(image, fp, filename, check=0):
             rawmode, bits, colors = SAVE[im.mode]
         except KeyError:
             raise IOError("cannot write mode %s as BMP" % im.mode)
+        matte_data = bytearray()
+        if im.format == 'BMP':
+
+        #write matte data. Taken from imagemagick
+            scanline_pad = (((im.size[0]+31) & ~31)-im.size[0]) >> 3
+            row_len = im.size[0]*4
+            for y in reversed(xrange(im.size[1])):
+                d = data[40:]
+                #BGRA
+                row_pixels = d[row_len*y:row_len*y+row_len]
+                bit=0
+                byte=0
+                for x in xrange(im.size[0]):
+                    p=row_pixels[x]
+
+                    byte<<=1
+                    bit+=1
+                    if bit == 8:
+                        matte_data+=o8(byte)
+                        bit=0
+                        byte=0
+                if not bit == 0:
+                    matte_data+=o8(byte<<(8-bit))
+                for i in xrange(scanline_pad):
+                    matte_data+=o8(0)
 
         fp.write(o8(im.size[0]) +            # width
                  o8(im.size[1]) +            # height
@@ -337,16 +362,42 @@ def _save(image, fp, filename, check=0):
                  o8(0) +                     # reserved
                  o16(1) +                    # planes
                  o16(bits) +                 # depth
-                 o32(len(data)) +        # size of image in bytes
+                 o32(len(data+matte_data)) +        # size of image in bytes
                  o32(current_offset)            # offset
 
             )
-        current_offset += len(data)
+        current_offset += len(data+matte_data)
 
     for im in images:
 
         data = get_data(im)
         fp.write(data)
+
+        if im.format == 'BMP':
+
+        #write matte data. Taken from imagemagick
+            scanline_pad = (((im.size[0]+31) & ~31)-im.size[0]) >> 3
+            row_len = im.size[0]*4
+            for y in reversed(xrange(im.size[1])):
+                d = data[40:]
+                #BGRA
+                row_pixels = d[row_len*y:row_len*y+row_len]
+                bit=0
+                byte=0
+                for x in xrange(im.size[0]):
+                    p=row_pixels[x]
+
+                    byte<<=1
+                    bit+=1
+                    if bit == 8:
+                        fp.write(o8(byte))
+                        bit=0
+                        byte=0
+                if not bit == 0:
+                    fp.write(o8(byte<<(8-bit)))
+                for i in xrange(scanline_pad):
+                    fp.write(o8(0))
+
 
     fp.flush()
 

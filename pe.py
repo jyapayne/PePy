@@ -4,7 +4,7 @@ from cStringIO import StringIO
 
 from ico_plugin import *
 
-def resize(image, size):
+def resize(image, size, format=None):
     output = StringIO()
     back = Image.new('RGBA', size, (0,0,0,0))
     image.thumbnail(size, Image.ANTIALIAS)
@@ -14,7 +14,8 @@ def resize(image, size):
     else:
         offset[0] = back.size[0]/2-image.size[0]/2
     back.paste(image, tuple(offset))
-    back.save(output, image.format)
+    format = format or image.format
+    back.save(output, format)
     contents = output.getvalue()
     output.close()
     return contents
@@ -1252,20 +1253,16 @@ class PEFile(Printable):
         g_entry = group_header.entries[0]
 
         icon = Image.open(icon_path)
-        i_data = resize(icon, (g_entry.Width.value, g_entry.Height.value))
-        s = StringIO()
-        s.write(i_data)
-        s.seek(0)
+        i_data = resize(icon, (g_entry.Width.value, g_entry.Height.value), format='ico')
 
-        icon = Image.open(s)
-        s2 = StringIO()
-        icon.save(s2, 'ico')
-        new_icon_size = s2.tell()
-        s2.seek(0)
+        new_icon_size = len(i_data)
         icon_file_size = g_entry.DataSize.value+group_header.size+g_entry.size+2
 
         #9662 is the exact length of the icon in nw.exe
-        icon_data = bytearray(s2.read()) + bytearray(icon_file_size-new_icon_size)
+        extra_size = icon_file_size-new_icon_size
+        if extra_size < 0:
+            extra_size = 0
+        icon_data = bytearray(i_data) + bytearray(extra_size)
 
         icon_header = IconHeader.parse_from_data(icon_data, absolute_offset=0)
 

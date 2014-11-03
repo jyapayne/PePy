@@ -254,7 +254,7 @@ def _save(im, fp, filename, check=0):
     ppm = tuple(map(lambda x: int(x * 39.3701), dpi))
 
     stride = ((im.size[0]*bits+7)//8+3) & (~3)
-    header = 64 #108 if im.mode == 'RGBA' else 40  # or 64 for OS/2 version 2
+    header = 108 if im.mode == 'RGBA' else 40  # or 64 for OS/2 version 2
     offset = 14 + header + colors*4
     image = stride * im.size[1]
 
@@ -265,14 +265,14 @@ def _save(im, fp, filename, check=0):
 
     # bitmap header
     fp.write(b"BM" +                      # file type (magic)
-             o32(offset+image) +          # file size
+             o32(offset+image+16) +          # file size
              o32(0) +                     # reserved
-             o32(offset))                 # image data offset
+             o32(offset+16))                 # image data offset
 
     width,height = im.size
 
     # bitmap info header
-    fp.write(o32(header) +                # info header size
+    fp.write(o32(header+16) +                # info header size
              o32(width) +            # width
              o32(height) +            # height
              o16(1) +                     # planes
@@ -281,28 +281,28 @@ def _save(im, fp, filename, check=0):
              o32(image) +                 # size of bitmap
              o32(ppm[0]) + o32(ppm[1]) +  # resolution
              o32(colors) +                # colors used
-             o32(colors) +               # colors important
-             o32(red_mask) +              # red channel ma
-             o32(green_mask) +            # green channel mask
-             o32(blue_mask) +             # blue channel mask
-             o32(alpha_mask)
+             o32(colors)                # colors important
+             #o32(red_mask) +              # red channel ma
+             #o32(green_mask) +            # green channel mask
+             #o32(blue_mask) +             # blue channel mask
+             #o32(alpha_mask)
              )
     # This was commented out because although it works, some
     # decoders do not support images with a BI_BITFIELDS compression
     #
-    #if im.mode == 'RGBA':
-    #    fp.write(o32(red_mask) +              # red channel mask
-    #             o32(green_mask) +            # green channel mask
-    #             o32(blue_mask) +             # blue channel mask
-    #             o32(alpha_mask) +            # alpha channel mask
-    #             'BGRs' +                     # Color Space
-    #             o8(0)*0x24 +                 # ciexyztriple color space endpoints
-    #             o32(0) +                     # red gamma
-    #             o32(0) +                     # green gamma
-    #             o32(0)                       # blue gamma
-    #             )
+    if im.mode == 'RGBA':
+        fp.write(o32(red_mask) +              # red channel mask
+                 o32(green_mask) +            # green channel mask
+                 o32(blue_mask) +             # blue channel mask
+                 o32(alpha_mask) +            # alpha channel mask
+                 'BGRs' +                     # Color Space
+                 o8(0)*0x24 +                 # ciexyztriple color space endpoints
+                 o32(0) +                     # red gamma
+                 o32(0) +                     # green gamma
+                 o32(0)                       # blue gamma
+                 )
 
-    fp.write(bytearray(header - 40 - 4))
+    fp.write(bytearray(16))
 
     if im.mode == "1":
         for i in (0, 255):
