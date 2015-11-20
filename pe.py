@@ -1237,7 +1237,7 @@ class PEFile(Printable):
         of the file, but that did not work. Comments were left as history
         to what I attempted.
         """
-        icon_path = str(os.path.expanduser(icon_path)) #this needs to be a string and not unicode
+        icon_path = os.path.expanduser(icon_path) #this needs to be a string and not unicode
 
         if not os.path.exists(icon_path):
             raise Exception('Icon {} does not exist'.format(icon_path))
