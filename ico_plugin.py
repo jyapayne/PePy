@@ -25,9 +25,8 @@
 __version__ = "0.1"
 
 from PIL import Image, ImageFile, BmpImagePlugin, PngImagePlugin, _binary
-import bmpimageplugin
-from bmpimageplugin import *
-from cStringIO import StringIO
+from .bmpimageplugin import *
+from io import BytesIO, StringIO
 from math import log, ceil
 
 i8 = _binary.i8
@@ -63,7 +62,7 @@ class IcoFile:
         self.nb_items = i16(s[4:])
 
         # Get headers for each item
-        for i in xrange(self.nb_items):
+        for i in range(self.nb_items):
             s = buf.read(16)
 
             icon_header = {
@@ -137,18 +136,18 @@ class IcoFile:
 
         if data[:8] == PngImagePlugin._MAGIC:
             # png frame
-            s = StringIO()
+            s = BytesIO()
             s.write(self.buf.read(header['size']))
             s.seek(0)
             self.buf.seek(header['offset'])
             im = Image.open(s)
         else:
             # XOR + AND mask bmp frame
-            s = StringIO()
+            s = BytesIO()
             s.write(self.buf.read(header['size']))
             s.seek(0)
             self.buf.seek(header['offset'])
-            im = bmpimageplugin.DibImageFile(s)
+            im = DibImageFile(s)
             #im = im.to_bitmapimage(header)
             #print im.tile
             # change tile dimension to only encompass XOR image
@@ -272,7 +271,7 @@ SAVE = {
 }
 
 def get_data(im):
-    s = StringIO()
+    s = BytesIO()
     if im.format != 'DIB':
         im.save(s, im.format)
     else:
@@ -284,9 +283,9 @@ def get_data(im):
         bmp_f.seek(10)
         offset = i32(bmp_f.read(4))
         dib_size = i32(bmp_f.read(4))
-        dib = o32(dib_size)+bytearray(bmp_f.read(36))
+        dib = bytearray(o32(dib_size)+bytearray(bmp_f.read(36)))
         dib[:4] = o32(40)
-        dib[8:12] = o32(i32(str(dib[8:12]))*2)
+        dib[8:12] = o32(i32(dib[8:12])*2)
         dib[16:20] = o32(0)
         dib = dib[:40]
         bmp_f.seek(offset)
@@ -303,7 +302,7 @@ def _save(image, fp, filename, check=0):
     data = None
     images = []
     if image.format != 'ICO':
-        bmp_f = StringIO()
+        bmp_f = BytesIO()
         image.save(bmp_f, format='BMP')
         bmp_f.seek(0)
         im2 = Image.open(bmp_f)
@@ -336,13 +335,13 @@ def _save(image, fp, filename, check=0):
         #write matte data. Taken from imagemagick
             scanline_pad = (((im.size[0]+31) & ~31)-im.size[0]) >> 3
             row_len = im.size[0]*4
-            for y in reversed(xrange(im.size[1])):
+            for y in reversed(range(im.size[1])):
                 d = data[40:]
                 #BGRA
                 row_pixels = d[row_len*y:row_len*y+row_len]
                 bit=0
                 byte=0
-                for x in xrange(im.size[0]):
+                for x in range(im.size[0]):
                     p=row_pixels[x]
 
                     byte<<=1
@@ -353,7 +352,7 @@ def _save(image, fp, filename, check=0):
                         byte=0
                 if not bit == 0:
                     matte_data+=o8(byte<<(8-bit))
-                for i in xrange(scanline_pad):
+                for i in range(scanline_pad):
                     matte_data+=o8(0)
 
         fp.write(o8(im.size[0]) +            # width
@@ -378,13 +377,13 @@ def _save(image, fp, filename, check=0):
         #write matte data. Taken from imagemagick
             scanline_pad = (((im.size[0]+31) & ~31)-im.size[0]) >> 3
             row_len = im.size[0]*4
-            for y in reversed(xrange(im.size[1])):
+            for y in reversed(range(im.size[1])):
                 d = data[40:]
                 #BGRA
                 row_pixels = d[row_len*y:row_len*y+row_len]
                 bit=0
                 byte=0
-                for x in xrange(im.size[0]):
+                for x in range(im.size[0]):
                     p=row_pixels[x]
 
                     byte<<=1
@@ -395,7 +394,7 @@ def _save(image, fp, filename, check=0):
                         byte=0
                 if not bit == 0:
                     fp.write(o8(byte<<(8-bit)))
-                for i in xrange(scanline_pad):
+                for i in range(scanline_pad):
                     fp.write(o8(0))
 
 

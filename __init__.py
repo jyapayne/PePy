@@ -1,3 +1,3 @@
 __all__ = ['pe']
 
-from pe import *
+from .pe import *

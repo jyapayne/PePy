@@ -29,7 +29,7 @@ __version__ = "0.7"
 
 from PIL import Image, ImageFile, ImagePalette, _binary
 from PIL.BmpImagePlugin import * #This is a hack to override the default bmp plugin for PIL
-from cStringIO import StringIO
+from io import BytesIO
 import math
 
 i8 = _binary.i8
@@ -132,7 +132,7 @@ class BmpImageFile(ImageFile.ImageFile):
             elif bits == 16 and mask == (0x007c00, 0x0003e0, 0x00001f):
                 rawmode = "BGR;15"
             else:
-                print bits, map(hex, mask)
+                print(bits, map(hex, mask))
                 raise IOError("Unsupported BMP bitfields layout")
         elif compression != 0:
             raise IOError("Unsupported BMP compression (%d)" % compression)
@@ -204,7 +204,7 @@ class DibImageFile(BmpImageFile):
     def to_bitmapimage(self, header):
         self.fp.seek(header['offset'])
         d = bytearray(self.fp.read(header['size']))
-        print self.info
+        print(self.info)
         dpi = (96,96)
         ppm = tuple(map(lambda x: int(x * 39.3701), dpi))
 
@@ -213,7 +213,7 @@ class DibImageFile(BmpImageFile):
 
         dib_size = i32(str(d[:4]))
         offset = 14 + dib_size
-        data = StringIO()
+        data = BytesIO()
         data.write(b'BM'+
                 o32(14+len(d)) +
                 o32(0) +
@@ -262,7 +262,6 @@ def _save(im, fp, filename, check=0):
     green_mask = 0x0000ff00
     blue_mask = 0x000000ff
     alpha_mask = 0xff000000
-
     # bitmap header
     fp.write(b"BM" +                      # file type (magic)
              o32(offset+image+16) +          # file size
@@ -295,7 +294,7 @@ def _save(im, fp, filename, check=0):
                  o32(green_mask) +            # green channel mask
                  o32(blue_mask) +             # blue channel mask
                  o32(alpha_mask) +            # alpha channel mask
-                 'BGRs' +                     # Color Space
+                 b'BGRs' +                     # Color Space
                  o8(0)*0x24 +                 # ciexyztriple color space endpoints
                  o32(0) +                     # red gamma
                  o32(0) +                     # green gamma

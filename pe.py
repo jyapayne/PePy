@@ -1,18 +1,18 @@
 import os
 import struct
-from cStringIO import StringIO
+from io import BytesIO
 
-from ico_plugin import *
+from .ico_plugin import *
 
 def resize(image, size, format=None):
-    output = StringIO()
+    output = BytesIO()
     back = Image.new('RGBA', size, (0,0,0,0))
     image.thumbnail(size, Image.ANTIALIAS)
     offset = [0,0]
     if image.size[0] >= image.size[1]:
-        offset[1] = back.size[1]/2-image.size[1]/2
+        offset[1] = int(back.size[1]/2-image.size[1]/2)
     else:
-        offset[0] = back.size[0]/2-image.size[0]/2
+        offset[0] = int(back.size[0]/2-image.size[0]/2)
     back.paste(image, tuple(offset))
     format = format or image.format
     back.save(output, format)
@@ -166,7 +166,7 @@ name_dictionary = {'PEHeader_Machine': {
                                 0x10000000:'IMAGE_SCN_MEM_SHARED',
                                 0x20000000:'IMAGE_SCN_MEM_EXECUTE',
                                 0x40000000:'IMAGE_SCN_MEM_READ',
-                                0x80000000L:'IMAGE_SCN_MEM_WRITE',
+                                0x80000000:'IMAGE_SCN_MEM_WRITE',
 
                     },
 }
@@ -195,9 +195,8 @@ def read_bytes(file_data, offset, number_of_bytes, endian=None, string_data=None
         endian = endian or DEFAULT_ENDIAN
         endian = endian_symbols[endian]
 
-        data = str(file_data[offset:offset+number_of_bytes])
+        data = bytes(file_data[offset:offset+number_of_bytes])
         if len(data) != number_of_bytes:
-            #print 'data out of bounds:', 'offset', hex(offset), 'data', data, 'data_len', len(data), 'num_bytes', number_of_bytes, 'total', hex(len(file_data))
             return 0, u''
 
         return struct.unpack(endian+struct_symbols[number_of_bytes], data)[0], data
@@ -305,12 +304,9 @@ class Printable(object):
         return u', '.join(vals)
 
     def __repr__(self):
-        return unicode(self)
+        return str(self)
 
     def __str__(self):
-        return unicode(self).encode('utf-8')
-
-    def __unicode__(self):
         return u'{} [{}]'.format(self.__class__.__name__, self._dict_string())
 
 
@@ -385,7 +381,7 @@ class Structure(Printable):
         bit_length = len(bin(int_value))-2
 
         characteristics = {}
-        for i in xrange(bit_length):
+        for i in range(bit_length):
             set_bit = test_bit(int_value, i)
             char_name = field_name_dict.get(set_bit, '')
             if set_bit != 0 and char_name:
@@ -726,13 +722,14 @@ class OptionalHeader(Structure):
         """Parses the Structure from the file data."""
         self = cls(**cls_args)
         self._file_data = file_data
-        magic, _ = read_bytes(file_data, self.absolute_offset, 2)
+        magic, x = read_bytes(file_data, self.absolute_offset, 2)
 
         if magic == _32BIT_MAGIC:
             self._fields = self._fields_32
         elif magic == _32BIT_PLUS_MAGIC:
             self._fields = self._fields_32_plus
         else:
+            print(magic, _32BIT_MAGIC, _32BIT_PLUS_MAGIC)
             raise PEFormatError('Magic for Optional Header is invalid.')
 
         for field_name, field_info in self._fields.items():
@@ -859,9 +856,9 @@ class ResourceDirectoryString(Structure):
         size = field_info['size']
         self.size += size
         data = u''
-        for i in xrange(size):
+        for i in range(size):
             val, dat = read_bytes(file_data, absolute_offset+i*2,2)
-            data += dat
+            data += str(dat, 'utf-8')
 
         setattr(self, field_name, Structure(offset=field_info['offset'],
                                             size=size,
@@ -983,7 +980,7 @@ class IconHeader(Structure):
         self.entries = []
         entry_offset = 0
         self.total_size = self.size
-        for i in xrange(self.ImageCount.value):
+        for i in range(self.ImageCount.value):
             entry = IconEntry.parse_from_data(file_data, absolute_offset=self.absolute_offset+self.size+entry_offset, offset=entry_offset)
             entry.number = i + 1
             self.entries.append(entry)
@@ -1015,7 +1012,7 @@ class GroupHeader(Structure):
         entry_offset = 0
         self.total_size = self.size
         for icon_entry in icon_header.entries:
-            group_entry = GroupEntry.parse_from_data(bytearray(''), absolute_offset=self.absolute_offset+self.size+entry_offset, offset=entry_offset)
+            group_entry = GroupEntry.parse_from_data(bytearray(b''), absolute_offset=self.absolute_offset+self.size+entry_offset, offset=entry_offset)
             group_entry._file_data = self._file_data
             group_entry.copy_from(icon_entry)
             group_entry.number = icon_entry.number
@@ -1036,7 +1033,7 @@ class GroupHeader(Structure):
         self.entries = []
         entry_offset = 0
         self.total_size = self.size
-        for i in xrange(self.ResourceCount.value):
+        for i in range(self.ResourceCount.value):
             entry = GroupEntry.parse_from_data(file_data, absolute_offset=self.absolute_offset+self.size+entry_offset, offset=entry_offset)
             entry.number = i + 1
             self.entries.append(entry)
@@ -1078,7 +1075,7 @@ class IconEntry(Structure):
         offset = 6 #Default icon header size
         offset += self.size * len(group_entries)
 
-        for i in xrange(group_entry.number-1):
+        for i in range(group_entry.number-1):
             offset += group_entries[i].DataSize.value
 
         return offset
@@ -1141,7 +1138,7 @@ class PEFile(Printable):
        Right now this only reads the .rsrc section.
     """
 
-    signature = 'MZ'
+    signature = b'MZ'
     dos_header = None
 
     def __init__(self, file_path, endian='little'):
@@ -1162,18 +1159,19 @@ class PEFile(Printable):
         section_offset = self.pe_header.size+self.pe_header.absolute_offset+self.pe_header.SizeOfOptionalHeader.value
         self.sections = {}
 
-        for section_number in xrange(number_of_sections):
+        for section_number in range(number_of_sections):
             section_header = SectionHeader.parse_from_data(self.pe_file_data, absolute_offset=section_offset)
             section_offset += section_size
-            self.sections[section_header.Name.data.strip('\x00')] = section_header
+            header_name = str(section_header.Name.data, 'utf-8').strip('\x00')
+            self.sections[header_name] = section_header
 
             if section_header.PointerToLineNumbers.value != 0:
-                print '{} section contains line number COFF table, which is not implemented yet.'.format(section_header.Name)
+                print('{} section contains line number COFF table, which is not implemented yet.'.format(section_header.Name))
 
             if section_header.PointerToRelocations.value != 0:
-                print '{} section contains relocation table, which is not implemented yet.'.format(section_header.Name)
+                print('{} section contains relocation table, which is not implemented yet.'.format(section_header.Name))
 
-            if section_header.Name.data == '.rsrc\x00\x00\x00':
+            if section_header.Name.data == b'.rsrc\x00\x00\x00':
                 current_table_pointer = section_header.PointerToRawData.value
                 current_resource_directory_table = ResourceDirectoryTable.parse_from_data(self.pe_file_data, absolute_offset=current_table_pointer, _section_header=section_header, type=None)
                 self.resource_directory_table = current_resource_directory_table
@@ -1188,7 +1186,7 @@ class PEFile(Printable):
                     num_id_entries = resource_directory_table.NumberOfIDEntries.value
                     current_offset = resource_directory_table.absolute_offset + resource_directory_table.size
 
-                    for i in xrange(num_name_entries):
+                    for i in range(num_name_entries):
                         name_entry = ResourceDirectoryEntryName.parse_from_data(self.pe_file_data, absolute_offset=current_offset, _section_header=section_header)
                         current_offset += name_entry.size
 
@@ -1209,7 +1207,7 @@ class PEFile(Printable):
 
                         resource_directory_table.name_entries.append(name_entry)
 
-                    for i in xrange(num_id_entries):
+                    for i in range(num_id_entries):
                         id_entry = ResourceDirectoryEntryID.parse_from_data(self.pe_file_data, absolute_offset=current_offset, _section_header=section_header)
                         current_offset += id_entry.size
 
