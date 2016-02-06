@@ -7,12 +7,25 @@ from .ico_plugin import *
 def resize(image, size, format=None):
     output = BytesIO()
     back = Image.new('RGBA', size, (0,0,0,0))
-    image.thumbnail(size, Image.ANTIALIAS)
-    offset = [0,0]
-    if image.size[0] >= image.size[1]:
+
+    if image.size[0] < size[0] or image.size[1] < size[1]:
+        if image.height > image.width:
+            factor = size[0] / image.height
+        else:
+            factor = size[1] / image.width
+        image = image.resize((int(image.width * factor), int(image.height * factor)), Image.ANTIALIAS)
+    else:
+        image.thumbnail(size, Image.ANTIALIAS)
+
+    offset = [0, 0]
+    if image.size[0] > image.size[1]:
         offset[1] = int(back.size[1]/2-image.size[1]/2)
+    elif image.size[0] < image.size[1]:
+        offset[0] = int(back.size[0]/2-image.size[0]/2)
     else:
         offset[0] = int(back.size[0]/2-image.size[0]/2)
+        offset[1] = int(back.size[1]/2-image.size[1]/2)
+
     back.paste(image, tuple(offset))
     format = format or image.format
     back.save(output, format)
