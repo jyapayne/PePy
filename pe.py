@@ -1266,7 +1266,15 @@ class PEFile(Printable):
         g_entry = group_header.entries[0]
 
         icon = Image.open(icon_path)
-        i_data = resize(icon, (g_entry.Width.value, g_entry.Height.value), format='ico')
+        width = g_entry.Width.value
+        height = g_entry.Height.value
+
+        if width == 0:
+            width = 256
+        if height == 0:
+            height = 256
+
+        i_data = resize(icon, (width, height), format='ico')
 
         new_icon_size = len(i_data)
         icon_file_size = g_entry.DataSize.value+group_header.size+g_entry.size+2
