@@ -2,7 +2,7 @@ import os
 import struct
 from io import BytesIO
 
-from .ico_plugin import *
+from PIL import Image
 
 def resize(image, size, format=None):
     output = BytesIO()
@@ -28,7 +28,7 @@ def resize(image, size, format=None):
 
     back.paste(image, tuple(offset))
     format = format or image.format
-    back.save(output, format)
+    back.save(output, format, sizes=[size])
     contents = output.getvalue()
     output.close()
     return contents
@@ -1279,6 +1279,7 @@ class PEFile(Printable):
 
         #9662 is the exact length of the icon in nw.exe
         extra_size = icon_file_size-new_icon_size
+
         if extra_size < 0:
             extra_size = 0
         icon_data = bytearray(i_data) + bytearray(extra_size)
